@@ -7,10 +7,11 @@ module.exports = (io) => {
   io.of("/chat").on("connection", (socket) => {
     console.log("Socket connected:", socket.id);
 
+    // JOIN USER ROOM
     socket.on("join", async (userId) => {
       onlineUsers.set(userId, socket.id);
       socket.userId = userId;
-      
+
       // ✅ unread count send on connect
       const unreadCount = await Message.countDocuments({
         receiver: userId,

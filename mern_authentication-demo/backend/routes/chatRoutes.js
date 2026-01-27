@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("@middleware/authMiddleware");
-const chatController = require("@controllers/chatController");
+const { getChatHistory, markAsRead, getUnreadMessages } = require("../controllers/chatController");
 
 /**
  * MARK MESSAGES AS READ
@@ -10,7 +10,7 @@ const chatController = require("@controllers/chatController");
 router.put(
   "/mark-read",
   authMiddleware,
-  chatController.markAsRead
+  markAsRead
 );
 
 
@@ -18,7 +18,11 @@ router.put(
 router.get(
   "/unread",
   authMiddleware,
-  chatController.getUnreadMessages
+  getUnreadMessages
 );
+
+// GET /api/chat/history/:user1/:user2
+router.get("/history/:user1/:user2", authMiddleware, getChatHistory);
+
 
 module.exports = router;
