@@ -44,6 +44,7 @@ app.use(helmet());
    ROUTES
 ================================ */
 app.use("/api/auth", require("@routes/authRoutes"));
+app.use("/api/stats", require("./routes/statsRoutes"));
 app.use("/api/users", require("@routes/userRoutes"));
 app.use("/api/chat", require("@routes/chatRoutes"));
 app.use(require("@middleware/errorHandler"));

@@ -332,9 +332,27 @@ server.listen(5000, () => console.log('Server running'));
 npx create-react-app frontend
 cd frontend
 npm install axios socket.io-client highcharts highcharts-react-official
+npm install react-router-dom jwt-decode
 ```
 
+
 ---
+
+frontend/
+├── public/
+│   └── index.html
+├── src/
+│   ├── api/
+│   ├── auth/
+│   ├── pages/
+│   ├── components/
+│   ├── socket/
+│   ├── charts/
+│   ├── App.jsx
+│   ├── index.js
+│   └── index.css
+├── package.json
+
 
 ## 8. Dynamic Scroll Pagination (React)
 
@@ -425,3 +443,6 @@ If you want:
 * Advanced chat (groups, seen, typing)
 
 Just tell me 👍
+
+
+docker compose up --build

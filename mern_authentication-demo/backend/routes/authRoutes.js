@@ -1,10 +1,13 @@
 const express = require("express");
-const router = express.Router();
-const authController = require("@controllers/authController");
 const { loginLimiter } = require("@middleware/rateLimiter"); // ✅ IMPORT
+const { register, login } = require("../controllers/authController");
 
+const { validateBody } = require("../middleware/validate");
+const { registerSchema, loginSchema } = require("../validations/auth.validation");
 
-router.post("/register", authController.register);
-router.post("/login", loginLimiter, authController.login);
+const router = express.Router();
+
+router.post("/register", validateBody(registerSchema), register);
+router.post("/login", loginLimiter, validateBody(loginSchema), login);
 
 module.exports = router;
