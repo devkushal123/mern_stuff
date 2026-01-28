@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const mongoose = require("mongoose");
 
 exports.profile = (req, res) => {
   res.json({
@@ -16,28 +17,51 @@ exports.adminDashboard = (req, res) => {
 
 
 
+
 /**
  * GET /api/users
- * returns list of users (without password)
- * supports ?search=
+ * Returns list of users for chat.
+ * - Non-admin: excludes admins
+ * - Admin: can see all (optional: also exclude themselves)
+ * Supports optional ?search=
  */
 exports.getAllUsers = async (req, res) => {
   try {
-    const search = req.query.search;
+    const requesterRole = req.user?.role;
+    const requesterId = req.user?.id;
 
-    const filter = search
-      ? {
-          $or: [
-            { name: { $regex: search, $options: "i" } },
-            { email: { $regex: search, $options: "i" } },
-          ],
-        }
-      : {};
+    const requesterIdObj =
+      mongoose.Types.ObjectId.isValid(requesterId)
+        ? new mongoose.Types.ObjectId(requesterId)
+        : null;
 
-    const users = await User.find(filter).select("_id name email"); // ✅ safe fields only
+    const { search } = req.query;
+    const baseFilter = {};
+
+    if (search) {
+      baseFilter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Hide admins for non-admin requesters
+    if (requesterRole !== "admin") {
+      baseFilter.role = { $ne: "admin" };
+    }
+
+    // Exclude self right in the query
+    if (requesterIdObj) {
+      baseFilter._id = { $ne: requesterIdObj };
+    }
+
+    const users = await User.find(baseFilter)
+      .select("_id name email role")
+      .lean();
+
     return res.status(200).json(users);
-  } catch (error) {
-    console.error("getAllUsers error:", error);
+  } catch (err) {
+    console.error("getAllUsers error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };

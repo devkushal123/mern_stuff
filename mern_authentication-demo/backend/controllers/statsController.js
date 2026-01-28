@@ -1,83 +1,238 @@
-
+// controllers/statsController.js
 const User = require("../models/User");
 const Message = require("../models/Message");
 
-/**
- * GET /api/stats
- * Returns dashboard stats + last 7 days messages chart data
- */
+// ---- Date helpers (no external libs) ----
+function startOfDay(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+function formatYYYYMMDD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 exports.getStats = async (req, res) => {
   try {
-    // Basic counts
-    const [totalUsers, totalMessages, unreadMessages, deliveredMessages] =
-      await Promise.all([
-        User.countDocuments(),//// total users
-        Message.countDocuments(),//// total messages sent
-        Message.countDocuments({ isRead: false }),// unread messages (for analytics, not per-user)
-        Message.countDocuments({ isDelivered: true }),// delivered 
+    const { id: userId, role } = req.user || {};
+    if (!userId || !role) {
+      return res.status(401).json({ message: "Unauthorized: missing user context" });
+    }
+
+    // window (default last 30 days)
+    const { from, to } = req.query || {};
+    const now = new Date();
+    const end = to ? startOfDay(new Date(to)) : startOfDay(now);
+    const start = from ? startOfDay(new Date(from)) : startOfDay(addDays(end, -29));
+    const dayCount = Math.round((end - start) / (24 * 3600 * 1000)) + 1;
+
+    // Build common labels
+    const labels = [];
+    for (let i = 0; i < dayCount; i++) labels.push(formatYYYYMMDD(addDays(start, i)));
+
+    // =========================
+    // PERSONAL DASHBOARD (role: user)
+    // =========================
+    if (role === "user") {
+      // 1) Inbox metrics (received by me)
+      const [unreadReceived, totalReceived] = await Promise.all([
+        Message.countDocuments({ receiver: userId, isRead: false }),
+        Message.countDocuments({ receiver: userId }),
       ]);
-    // not delivered messages  
-    const undeliveredMessages = totalMessages - deliveredMessages;
+      const readReceived = totalReceived - unreadReceived;
 
-    // Today count
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+      // 2) Sent status (sent by me)
+      const [sentTotal, deliveredSent, readSent] = await Promise.all([
+        Message.countDocuments({ sender: userId }),
+        Message.countDocuments({ sender: userId, isDelivered: true }),
+        Message.countDocuments({ sender: userId, isRead: true }), // if receiver read it
+      ]);
+      const pendingSent = Math.max(sentTotal - deliveredSent, 0);
 
-    const messagesToday = await Message.countDocuments({
-      createdAt: { $gte: startOfToday },
-    });
+      // 3) Trend: sent and received per day
+      const [sentRaw, recvRaw] = await Promise.all([
+        Message.aggregate([
+          { $match: { sender: userId, createdAt: { $gte: start, $lt: addDays(end, 1) } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]),
+        Message.aggregate([
+          { $match: { receiver: userId, createdAt: { $gte: start, $lt: addDays(end, 1) } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]),
+      ]);
+      const sentMap = new Map(sentRaw.map(r => [r._id, r.count]));
+      const recvMap = new Map(recvRaw.map(r => [r._id, r.count]));
+      const sentPerDay = labels.map(l => sentMap.get(l) || 0);
+      const receivedPerDay = labels.map(l => recvMap.get(l) || 0);
 
-    // Last 7 days trend (date -> count)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 5); // includes today (7 points)
-    sevenDaysAgo.setHours(0, 0, 0, 0);
+      // 4) Top contacts (people I chat with most)
+      // count messages where I'm either sender or receiver, group by counterpart
+      const topContactsRaw = await Message.aggregate([
+        {
+          $match: {
+            $or: [{ sender: userId }, { receiver: userId }],
+          },
+        },
+        {
+          $project: {
+            other: {
+              $cond: [{ $eq: ["$sender", userId] }, "$receiver", "$sender"],
+            },
+          },
+        },
+        { $group: { _id: "$other", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 5 },
+      ]);
+      const topContacts = await Promise.all(
+        topContactsRaw.map(async r => {
+          const u = await User.findById(r._id).select("name email");
+          return { name: u?.name || u?.email || "Unknown", count: r.count };
+        })
+      );
 
-    const dailyAgg = await Message.aggregate([
-      { $match: { 
-          createdAt: { 
-            $gte: sevenDaysAgo 
-            // $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-          } 
-        } 
-      },
+      // 5) Heatmap: my activity (sent OR received)
+      const myHeatRaw = await Message.aggregate([
+        {
+          $match: {
+            $or: [{ sender: userId }, { receiver: userId }],
+          },
+        },
+        {
+          $group: {
+            _id: {
+              dow: { $isoDayOfWeek: "$createdAt" }, // 1..7 Mon..Sun
+              hour: { $hour: "$createdAt" },        // 0..23
+            },
+            value: { $sum: 1 },
+          },
+        },
+        { $sort: { "_id.dow": 1, "_id.hour": 1 } },
+      ]);
+      const hourlyHeatmap = myHeatRaw.map(r => ({
+        day: r._id.dow,
+        hour: r._id.hour,
+        value: r.value,
+      }));
+
+      return res.json({
+        scope: "Personal",
+        // Inbox
+        inbox: {
+          totalReceived,
+          unreadReceived,
+          readReceived,
+        },
+        // Sent status
+        sentStatus: {
+          sentTotal,
+          delivered: deliveredSent,
+          read: readSent,
+          pending: pendingSent,
+        },
+        // Trend
+        trend: {
+          labels,
+          sentPerDay,
+          receivedPerDay,
+        },
+        // Lists
+        topContacts,
+        // Heatmap
+        hourlyHeatmap,
+      });
+    }
+
+    // ===========================================
+    // MANAGER / ADMIN (keep your existing behavior)
+    // ===========================================
+    // Totals (global or team—depending on your role scoping)
+    const totalUsers = await User.countDocuments();
+    const totalMessages = await Message.countDocuments();
+    const unreadMessages = await Message.countDocuments({ isRead: false });
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const activeSenderIds = await Message.distinct("sender", { createdAt: { $gte: since24h } });
+    const activeUsers24h = activeSenderIds.length;
+
+    const trendRaw = await Message.aggregate([
+      { $match: { createdAt: { $gte: start, $lt: addDays(end, 1) } } },
       {
         $group: {
-          _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
-          },
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
           count: { $sum: 1 },
         },
       },
       { $sort: { _id: 1 } },
     ]);
+    const trendMap = new Map(trendRaw.map(r => [r._id, r.count]));
+    const data = labels.map(l => trendMap.get(l) || 0);
 
-    // Fill missing dates (so chart looks continuous)
-    const toYMD = (d) => d.toISOString().slice(0, 10);
-    const map = new Map(dailyAgg.map((x) => [x._id, x.count]));
+    const read = await Message.countDocuments({ isRead: true });
+    const unread = unreadMessages;
 
-    const labels = [];
-    const data = [];
+    const topSendersRaw = await Message.aggregate([
+      { $group: { _id: "$sender", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]);
+    const topSenders = await Promise.all(
+      topSendersRaw.map(async (r) => {
+        const u = await User.findById(r._id).select("name email");
+        return { name: u?.name || u?.email || "Unknown", count: r.count };
+      })
+    );
 
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(sevenDaysAgo);
-      day.setDate(sevenDaysAgo.getDate() + i);
+    const hourlyRaw = await Message.aggregate([
+      {
+        $group: {
+          _id: {
+            dow: { $isoDayOfWeek: "$createdAt" },
+            hour: { $hour: "$createdAt" },
+          },
+          value: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.dow": 1, "_id.hour": 1 } },
+    ]);
+    const hourlyHeatmap = hourlyRaw.map(r => ({
+      day: r._id.dow,
+      hour: r._id.hour,
+      value: r.value,
+    }));
 
-      const key = toYMD(day);
-      labels.push(key);
-      data.push(map.get(key) || 0);
-    }
-
-    return res.status(200).json({
+    return res.json({
+      scope: "Global",
       totalUsers,
       totalMessages,
       unreadMessages,
-      deliveredMessages,
-      undeliveredMessages,
-      messagesToday,
-      last7Days: { labels, data }, // ✅ perfect for charts
+      activeUsers24h,
+      last30Days: { labels, data },
+      readVsUnread: { read, unread },
+      topSenders,
+      hourlyHeatmap,
     });
-  } catch (err) {
-    console.error("Stats error:", err);
-    return res.status(500).json({ error: "ServerError", message: err.message });
+  } catch (e) {
+    console.error("Stats error:", e);
+    res.status(500).json({ message: "Stats error" });
   }
 };

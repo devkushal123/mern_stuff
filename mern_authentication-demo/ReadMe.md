@@ -446,3 +446,8 @@ Just tell me 👍
 
 
 docker compose up --build
+
+<!------------------------------------- role---------------------------- -->
+Admin can request global|team|self
+Manager can request team|self
+User can request self only
