@@ -24,7 +24,14 @@ const messageSchema = new mongoose.Schema(
 );
 
 // Chat queries fast banane ke liye compound indexes
-messageSchema.index({ receiver: 1, isRead: 1, createdAt: -1 });
-messageSchema.index({ sender: 1, receiver: 1, createdAt: -1 });
+// MessageSchema.indexes (example)
+messageSchema.index({ receiver: 1, isRead: 1 });
+messageSchema.index({ sender: 1, isDelivered: 1 });
+messageSchema.index({ sender: 1, createdAt: 1 });
+messageSchema.index({ receiver: 1, createdAt: 1 });
+messageSchema.index({ createdAt: 1 });
+messageSchema.index({ sender: 1 });  // for distinct/aggregation on sender
+
+
 
 module.exports = mongoose.model("Message", messageSchema);

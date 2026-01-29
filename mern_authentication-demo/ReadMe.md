@@ -451,3 +451,60 @@ docker compose up --build
 Admin can request global|team|self
 Manager can request team|self
 User can request self only
+
+
+- charts type----
+  line, spline, area, areaspline, column, bar, pie, scatter, gauge, arearange, areasplinerange and columnrange.
+
+- most common used charts Types: Bar Charts, Line Graphs, and Pie Charts 
+
+<!-- - Donut chart--- -->
+A donut chart is created by adding multiple pie series to the chart, setting the size and innerSize of each series to create concentric rings.
+
+
+<!-- Heatmap--- -->
+- A heat map is a graphical representation of data where the individual values contained in a matrix are represented as colors.
+
+- A heatmap is a grid-based chart where color intensity represents the amount of activity in each cell.
+- For your chat app dashboard:
+  X‑axis = Hours of the day (0–23)
+  Y‑axis = Days of the week (Mon–Sun)
+  Each cell’s color = Number of messages in that day+hour slot
+
+  This lets you see when users are most active at a glance.
+
+💼 Practical Uses in Your Chat App
+  - Identify peak hours
+    See the darkest cells—those are your busiest times. 
+    Plan resources (servers, support staff) accordingly.
+
+  - Team scheduling
+    If this is for internal teams, align shifts with high-activity times.
+
+  - Behavior patterns
+    Find consistent trends, e.g., heavy usage on weekdays 10:00–13:00; low on weekends.
+  - Anomaly detection
+    Unexpected spikes/drops might indicate issues (downtime) or successful campaigns.
+  - Personal vs Global view
+    Personal (normal user): Show their own activity (sent or received) by hour/day.
+    Global/Team (manager/admin): Show aggregated activity across all users/team.
+
+<!-- refernce for highcharts -->
+https://www.highcharts.com/docs/chart-and-series-types/heatmap
+
+<!-- set up dummy data (seed) for your MERN chat project -  -->
+  Authentication: 1 admin, 2 managers, 4 normal users
+  Chat: 400 realistic messages over the last 30 days with isDelivered and isRead flags
+  Dashboard stats: global and per-user stats for expressive charts (area-spline, bar, pie/donut)
+  Heatmap points: Mon–Sun × 0–23h activity grid
+
+
+<!-- After seeding — quick checks -->
+- Users collection: 7 docs (1 admin, 2 managers, 4 users)
+- Messages collection: 400 docs with isDelivered / isRead and createdAt across the last 30 days
+- No messages involve the admin
+- Dashboard charts:
+    - Area-spline trend uses createdAt
+    - Donut/Pie uses read vs unread counts
+    - Bar (top senders) should be non-zero
+    - Heatmap (Mon–Sun × 0–23h) should show distribution
