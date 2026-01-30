@@ -1,4 +1,5 @@
 const { getDateWindow } = require("../utils/dateUtils");
+const mongoose = require("mongoose");
 const {
   // user
   getUserInboxMetrics,
@@ -18,19 +19,22 @@ const {
 async function getStats(req, res) {
   try {
     const { id: userId, role } = req.user || {};
+    
     if (!userId || !role) {
       return res.status(401).json({ message: "Unauthorized: missing user context" });
     }
-
+    const userIdObj = mongoose.Types.ObjectId.isValid(userId) ? new mongoose.Types.ObjectId(userId) : null;
+    // console.log("req.user", req.user)
+    // console.log("req.query", req.query)
     const { start, end, endExclusive, labels } = getDateWindow(req.query);
-
+    // console.log("start, end, endExclusive, labels", start, end, endExclusive, labels)
     if (role === "user") {
       const [inbox, sentStatus, trend, topContacts, hourlyHeatmap] = await Promise.all([
-        getUserInboxMetrics(userId),
-        getUserSentStatus(userId),
-        getUserDailyTrends(userId, start, endExclusive, labels),
-        getTopContacts(userId),
-        getUserHourlyHeatmap(userId),
+        getUserInboxMetrics(userIdObj),
+        getUserSentStatus(userIdObj),
+        getUserDailyTrends(userIdObj, start, endExclusive, labels),
+        getTopContacts(userIdObj),
+        getUserHourlyHeatmap(userIdObj),
       ]);
 
       return res.json({

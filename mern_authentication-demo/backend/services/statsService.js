@@ -47,7 +47,6 @@ async function getUserDailyTrends(userId, start, endExclusive, labels) {
       { $sort: { _id: 1 } },
     ]),
   ]);
-
   return {
     sentPerDay: mapDocsToSeries(labels, sentRaw),
     receivedPerDay: mapDocsToSeries(labels, recvRaw),

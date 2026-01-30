@@ -508,3 +508,124 @@ https://www.highcharts.com/docs/chart-and-series-types/heatmap
     - Donut/Pie uses read vs unread counts
     - Bar (top senders) should be non-zero
     - Heatmap (Mon–Sun × 0–23h) should show distribution
+
+- This seeds 1 admin, 2 managers, 4 users and 400 messages over 30 days.
+- mern_authentication-demo\backend\seed.js
+- Save as seed.js in your backend folder and run with node seed.js.
+
+
+<!-- requirements followed -->
+# -------------✅ What Admin Should See (Recommended Permissions)
+- Admin is not a regular chat participant.
+- Admin is a system owner, so their dashboard must show platform-wide insights, user management, message analytics, and maintenance controls.
+    - Below is the exact list of what an Admin should see ---- 
+##      🧭 1. Admin Dashboard (Global Overview)
+        🔹 Global KPIs
+-         Admin should see metrics across the entire system:
+            Total Users
+            Total Managers
+            Total Normal Users
+            Total Messages Sent
+            Total Delivered Messages
+            Total Read Messages
+            Total Unread Messages
+            Active Users (Last 24 Hours)
+            Online Users (socket connected count)
+
+        🔹 Global Charts
+            A) Messages Trend (area-spline)(activity chart or line chart)
+                Last 30 days
+                Total message count per day
+                Filter by 7d / 30d / 90d
+
+            B) Read vs Unread (donut/pie chart)
+                Entire platform
+
+            C) Top Senders (bar chart)
+                Top 5 users with highest message count
+
+            D) Global Heatmap (Mon–Sun × 0–23h)
+                System activity patterns
+                Identifies peak times
+                Resource planning
+##      🧭 2. Admin Should See All Users (User Management)
+            Admin needs access to all users, including managers and normal users.
+            They should be able to:----
+            🔹 View All Users List
+                    Name
+                    Email
+                    Role
+                    CreatedAt
+                    Last Active timestamp
+                    Total messages sent/received
+
+            🔹 Admin Actions
+                You can allow (optional):
+
+                Promote/demote role (user → manager, manager → user)
+                Freeze / deactivate account
+                Reset user password
+                Delete user (dangerous — optional)
+                View user-specific stats (click on a user → see their personal dashboard)
+
+                ** But do NOT show admin in chat user list — admins do not chat.
+
+##      🧭 3. Admin Should See Global Message Logs (Optional)
+            A table such as:
+            Sender      Receiver    Message     Delivered   Read    Timestamp
+            
+            You can give this with pagination.
+                Useful for:
+                    Moderation
+                    Debugging
+                    Abuse detection
+
+##      🧭 4. Admin Should See System Health / Monitoring (Optional)
+                Not required, but highly useful:
+                        Socket connections count
+                        API error logs
+                        Message queue size
+                        Server uptime
+                        Database status
+
+                This can be shown as a separate tab: "System Health".
+
+##      🧭 5. Admin Should NOT See
+                    These are important restrictions:
+                        ❌ Admin should NOT chat
+                            Do not show Messages UI
+                            Do not list users for chat
+                            Do not include admin in chat list
+
+                    ❌ Admin should NOT see personal inbox-like stats
+                        (no point in inbox for admin)
+                    ❌ Admin should NOT be included in top senders
+                        they don’t participate in messaging
+
+##      🧭 6. Admin Dashboard UI (Recommended Layout)
+                Top Section – Summary Cards
+                    Total Users
+                    Total Messages
+                    Unread Messages
+                    Active Users (24h)
+
+                Charts Row 1
+                    Message Trend (area-spline)
+                    Read vs Unread Pie
+
+                Charts Row 2
+                    Top Senders (bar chart)
+                    Heatmap (activity heatmap)
+
+                User Management Section-
+                    Table of all users
+                    Role badges
+                    Actions (reset password / deactivate / promote / inspect)
+
+# ------------------  What Normal User Should See
+    Only their activity:
+        Their inbox (unread vs read)
+        Their sent status (sent, delivered, read counts)
+        Their sent vs received trend
+        Their top contacts
+        Their heatmap (personal activity)
