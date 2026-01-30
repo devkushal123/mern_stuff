@@ -15,9 +15,6 @@ exports.adminDashboard = (req, res) => {
   });
 };
 
-
-
-
 /**
  * GET /api/users
  * Returns list of users for chat.

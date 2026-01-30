@@ -4,6 +4,8 @@ const router = express.Router();
 const authMiddleware = require("@middleware/authMiddleware");
 const { getChatHistory, markAsRead, getUnreadMessages } = require("../controllers/chatController");
 
+// this routes are not role based.
+
 /**
  * MARK MESSAGES AS READ
  */
